@@ -1,6 +1,9 @@
 """Лаба 3 - Артдуэль: поединок двух танков (tkinter)."""
 
+import math
+import random
 import tkinter as tk
+from tkinter import messagebox
 
 W, H = 900, 450      # размер поля
 ZEML = 400           # уровень земли
@@ -55,6 +58,8 @@ class Artduel:
         self.hp2 = 100
         self.x1 = X1             # позиции танков (потом меняются)
         self.x2 = X2
+        self.hod_igroka = True   # чей сейчас ход
+        self.snar = None         # летящий снаряд на канвасе
         self.narisovat()
 
     def narisovat(self):
@@ -77,13 +82,95 @@ class Artduel:
                            fill="#cc3333", outline="")
 
     def vistrel(self):
-        pass   # пока не стреляет
+        # ходит только игрок и только если нет летящего снаряда
+        if not self.hod_igroka or self.snar:
+            return
+        ugol = float(self.ugol_ent.get())
+        sila = float(self.sila_ent.get())
+        vx, vy = self.skorost(ugol, sila, vpravo=True)
+        self.zapustit(self.x1 + 18, ZEML - 34, vx, vy, vpravo=True)
+
+    def skorost(self, ugol, sila, vpravo):
+        # переводим угол и силу в скорость по осям
+        rad = ugol * math.pi / 180
+        v = sila * 0.22
+        naprav = 1 if vpravo else -1
+        return v * math.cos(rad) * naprav, -v * math.sin(rad)
+
+    def zapustit(self, x, y, vx, vy, vpravo):
+        self.snar = self.canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#222")
+        self.dvizh(vx, vy, vpravo)
+
+    def dvizh(self, vx, vy, vpravo):
+        c = self.canvas
+        x1, y1, x2, y2 = c.coords(self.snar)
+        x = (x1 + x2) / 2 + vx
+        y = (y1 + y2) / 2 + vy
+        vy += G
+        c.coords(self.snar, x - 4, y - 4, x + 4, y + 4)
+        tx = self.x2 if vpravo else self.x1
+        if abs(x - tx) < 28 and y > ZEML - 30:
+            self.popal(vpravo)
+            return
+        if y >= ZEML - 4 or x < -20 or x > W + 20:
+            self.mimo(vpravo)
+            return
+        self.root.after(20, lambda: self.dvizh(vx, vy, vpravo))
+
+    def popal(self, vpravo):
+        uron = random.randint(15, 35)
+        if vpravo:
+            self.hp2 = max(0, self.hp2 - uron)
+        else:
+            self.hp1 = max(0, self.hp1 - uron)
+        self.canvas.delete(self.snar)
+        self.snar = None
+        self.narisovat()
+        kto = "Вы попали!" if vpravo else "Вас ранили!"
+        self.status.config(text=f"{kto} Урон {uron}", fg="#aa2222")
+        if self.hp2 <= 0:
+            messagebox.showinfo("Победа!", "Вы уничтожили вражеский танк!")
+            self.novaya_igra()
+            return
+        if self.hp1 <= 0:
+            messagebox.showinfo("Поражение", "Ваш танк уничтожен...")
+            self.novaya_igra()
+            return
+        self.sled_hod(vpravo)
+
+    def mimo(self, vpravo):
+        self.canvas.delete(self.snar)
+        self.snar = None
+        self.status.config(text="Промах!", fg="#225522")
+        self.sled_hod(vpravo)
+
+    def sled_hod(self, vpravo):
+        if vpravo:
+            # после выстрела игрока ходит комп
+            self.hod_igroka = False
+            self.status.config(text="Ходит компьютер...", fg="#225522")
+            self.root.after(900, self.hod_kompa)
+        else:
+            self.hod_igroka = True
+            self.status.config(text="Ваш ход", fg="#225522")
+
+    def hod_kompa(self):
+        # комп пока стреляет наугад
+        ugol = random.randint(30, 60)
+        sila = random.randint(50, 80)
+        self.status.config(text=f"Комп: угол {ugol}, сила {sila}", fg="#225522")
+        vx, vy = self.skorost(ugol, sila, vpravo=False)
+        self.zapustit(self.x2 - 18, ZEML - 34, vx, vy, vpravo=False)
 
     def novaya_igra(self):
         self.hp1 = 100
         self.hp2 = 100
         self.x1 = X1
         self.x2 = X2
+        self.hod_igroka = True
+        if self.snar:
+            self.canvas.delete(self.snar)
+            self.snar = None
         self.narisovat()
         self.status.config(text="Новая игра. Ваш ход", fg="#225522")
 
