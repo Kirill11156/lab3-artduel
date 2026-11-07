@@ -51,6 +51,8 @@ class Artduel:
         self.sila_ent.pack(side="left", padx=4)
         self.sila_ent.insert(0, "50")
         tk.Button(panel, text="Огонь!", command=self.vistrel).pack(side="left", padx=10)
+        self.veter_lbl = tk.Label(panel, text="Ветер:", fg="#555")
+        self.veter_lbl.pack(side="left", padx=6)
         self.status = tk.Label(panel, text="Ваш ход", fg="#225522")
         self.status.pack(side="left", padx=10)
 
@@ -58,6 +60,8 @@ class Artduel:
         self.hp2 = 100
         self.x1 = X1             # позиции танков (потом меняются)
         self.x2 = X2
+        self.veter = 0           # снос снаряда ветром каждый тик
+        self.pokaz_veter()
         self.hod_igroka = True   # чей сейчас ход
         self.snar = None         # летящий снаряд на канвасе
         self.narisovat()
@@ -104,7 +108,7 @@ class Artduel:
     def dvizh(self, vx, vy, vpravo):
         c = self.canvas
         x1, y1, x2, y2 = c.coords(self.snar)
-        x = (x1 + x2) / 2 + vx
+        x = (x1 + x2) / 2 + vx + self.veter * 0.12
         y = (y1 + y2) / 2 + vy
         vy += G
         c.coords(self.snar, x - 4, y - 4, x + 4, y + 4)
@@ -144,7 +148,26 @@ class Artduel:
         self.status.config(text="Промах!", fg="#225522")
         self.sled_hod(vpravo)
 
+    def pokaz_veter(self):
+        # ветер меняется после каждого выстрела и сносит снаряд в сторону
+        self.veter = random.randint(-4, 4)
+        if self.veter > 0:
+            strelka = "→ " + str(self.veter)
+        elif self.veter < 0:
+            strelka = "← " + str(-self.veter)
+        else:
+            strelka = "штиль"
+        self.veter_lbl.config(text="Ветер: " + strelka)
+
+    def peredvinut(self):
+        # после выстрела танки меняют позиции - прицелиться по памяти не выйдет
+        self.x1 = random.randint(60, W // 2 - 60)
+        self.x2 = random.randint(W // 2 + 60, W - 60)
+        self.pokaz_veter()
+        self.narisovat()
+
     def sled_hod(self, vpravo):
+        self.peredvinut()
         if vpravo:
             # после выстрела игрока ходит комп
             self.hod_igroka = False
@@ -155,9 +178,21 @@ class Artduel:
             self.status.config(text="Ваш ход", fg="#225522")
 
     def hod_kompa(self):
-        # комп пока стреляет наугад
-        ugol = random.randint(30, 60)
-        sila = random.randint(50, 80)
+        # комп перебирает 40 вариантов и выбирает самый точный
+        best = None
+        for _ in range(40):
+            ugol = random.randint(25, 70)
+            sila = random.randint(45, 85)
+            vx, vy = self.skorost(ugol, sila, vpravo=False)
+            # грубо симулируем полет и смотрим куда упадет
+            x, y, cx, cy = self.x2, ZEML - 34, vx, vy
+            while y < ZEML and 0 < x < W:
+                x += cx + self.veter * 0.12
+                y += cy
+                cy += G
+            if best is None or abs(x - self.x1) < best[0]:
+                best = (abs(x - self.x1), ugol, sila)
+        ugol, sila = best[1], best[2]
         self.status.config(text=f"Комп: угол {ugol}, сила {sila}", fg="#225522")
         vx, vy = self.skorost(ugol, sila, vpravo=False)
         self.zapustit(self.x2 - 18, ZEML - 34, vx, vy, vpravo=False)
@@ -167,6 +202,7 @@ class Artduel:
         self.hp2 = 100
         self.x1 = X1
         self.x2 = X2
+        self.pokaz_veter()
         self.hod_igroka = True
         if self.snar:
             self.canvas.delete(self.snar)
