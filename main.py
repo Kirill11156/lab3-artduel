@@ -32,9 +32,11 @@ class Artduel:
         igra.add_command(label="Выход", command=root.destroy)
         menu.add_cascade(label="Игра", menu=igra)
         spravka = tk.Menu(menu, tearoff=0)
-        spravka.add_command(label="О программе", command=self.o_programme)
+        spravka.add_command(label="О программе", command=self.o_programme,
+                            accelerator="Ctrl+H")
         menu.add_cascade(label="Справка", menu=spravka)
         root.config(menu=menu)
+        root.bind_all("<Control-h>", lambda e: self.o_programme())
 
         self.canvas = tk.Canvas(root, width=W, height=H, bg=CVET_NEBO)
         self.canvas.pack()
@@ -89,8 +91,15 @@ class Artduel:
         # ходит только игрок и только если нет летящего снаряда
         if not self.hod_igroka or self.snar:
             return
-        ugol = float(self.ugol_ent.get())
-        sila = float(self.sila_ent.get())
+        try:
+            ugol = float(self.ugol_ent.get().replace(",", "."))
+            sila = float(self.sila_ent.get().replace(",", "."))
+        except ValueError:
+            self.status.config(text="Нужно ввести числа!", fg="#aa2222")
+            return
+        if not (1 <= ugol <= 89) or not (10 <= sila <= 100):
+            self.status.config(text="Угол 1..89, сила 10..100", fg="#aa2222")
+            return
         vx, vy = self.skorost(ugol, sila, vpravo=True)
         self.zapustit(self.x1 + 18, ZEML - 34, vx, vy, vpravo=True)
 
@@ -193,6 +202,7 @@ class Artduel:
             if best is None or abs(x - self.x1) < best[0]:
                 best = (abs(x - self.x1), ugol, sila)
         ugol, sila = best[1], best[2]
+        ugol += random.randint(-4, 4)   # разброс, чтоб не попадал всегда
         self.status.config(text=f"Комп: угол {ugol}, сила {sila}", fg="#225522")
         vx, vy = self.skorost(ugol, sila, vpravo=False)
         self.zapustit(self.x2 - 18, ZEML - 34, vx, vy, vpravo=False)
@@ -211,7 +221,20 @@ class Artduel:
         self.status.config(text="Новая игра. Ваш ход", fg="#225522")
 
     def o_programme(self):
-        pass   # потом сделаю
+        # модальное окно - пока его не закроешь, игра не работает
+        okno = tk.Toplevel(self.root)
+        okno.title("О программе")
+        okno.geometry("330x180+300+200")
+        okno.resizable(False, False)
+        okno.transient(self.root)
+        okno.grab_set()
+        tk.Label(okno, text="Артдуэль", font=("Arial", 14, "bold")).pack(pady=10)
+        tk.Label(okno, text="Лабораторная работа № 3\n"
+                            "Приложения с графическим интерфейсом\n"
+                            "Python + tkinter", justify="center").pack()
+        tk.Label(okno, text="Вариант (свой): поединок танков", fg="#666").pack(pady=4)
+        tk.Button(okno, text="Закрыть", command=okno.destroy).pack(pady=8)
+
 
 def main():
     root = tk.Tk()
