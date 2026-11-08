@@ -5,11 +5,12 @@ import random
 import tkinter as tk
 from tkinter import messagebox
 
-W, H = 900, 450
-ZEML = 400
-X1, X2 = 120, 780
-G = 0.35
+W, H = 900, 450      # размер поля
+ZEML = 400           # уровень земли
+X1, X2 = 120, 780    # позиции танков
+G = 0.35             # гравитация для снаряда
 
+# цвета
 CVET_NEBO = "#87CEEB"
 CVET_ZEML = "#5d8a3c"
 CVET_T1 = "#4a6fa5"
@@ -31,9 +32,11 @@ class Artduel:
         igra.add_command(label="Выход", command=root.destroy)
         menu.add_cascade(label="Игра", menu=igra)
         spravka = tk.Menu(menu, tearoff=0)
-        spravka.add_command(label="О программе", command=self.o_programme)
+        spravka.add_command(label="О программе", command=self.o_programme,
+                            accelerator="Ctrl+H")
         menu.add_cascade(label="Справка", menu=spravka)
         root.config(menu=menu)
+        root.bind_all("<Control-h>", lambda e: self.o_programme())
 
         self.canvas = tk.Canvas(root, width=W, height=H, bg=CVET_NEBO)
         self.canvas.pack()
@@ -55,8 +58,8 @@ class Artduel:
 
         self.hp1 = 100
         self.hp2 = 100
-        self.hod_igroka = True
-        self.snar = None
+        self.hod_igroka = True   # чей сейчас ход
+        self.snar = None         # летящий снаряд на канвасе
         self.narisovat()
 
     def narisovat(self):
@@ -67,6 +70,7 @@ class Artduel:
         self.tank(c, X2, CVET_T2, self.hp2, 2)
 
     def tank(self, c, x, cvet, hp, nomer):
+        # корпус, башня и ствол
         c.create_rectangle(x - 25, ZEML - 14, x + 25, ZEML, fill=cvet, outline="#333")
         c.create_rectangle(x - 12, ZEML - 26, x + 12, ZEML - 14, fill=cvet, outline="#333")
         c.create_line(x, ZEML - 20, x + 18, ZEML - 34, width=3, fill="#333")
@@ -78,14 +82,23 @@ class Artduel:
                            fill="#cc3333", outline="")
 
     def vistrel(self):
+        # ходит только игрок и только если нет летящего снаряда
         if not self.hod_igroka or self.snar:
             return
-        ugol = float(self.ugol_ent.get())   # пока без проверок
-        sila = float(self.sila_ent.get())
+        try:
+            ugol = float(self.ugol_ent.get().replace(",", "."))
+            sila = float(self.sila_ent.get().replace(",", "."))
+        except ValueError:
+            self.status.config(text="Нужно ввести числа!", fg="#aa2222")
+            return
+        if not (1 <= ugol <= 89) or not (10 <= sila <= 100):
+            self.status.config(text="Угол 1..89, сила 10..100", fg="#aa2222")
+            return
         vx, vy = self.skorost(ugol, sila, vpravo=True)
         self.zapustit(X1 + 18, ZEML - 34, vx, vy, vpravo=True)
 
     def skorost(self, ugol, sila, vpravo):
+        # переводим угол и силу в скорость по осям
         rad = ugol * math.pi / 180
         v = sila * 0.22
         naprav = 1 if vpravo else -1
@@ -122,7 +135,6 @@ class Artduel:
         self.narisovat()
         kto = "Вы попали!" if vpravo else "Вас ранили!"
         self.status.config(text=f"{kto} Урон {uron}", fg="#aa2222")
-        print("debug: попадание, урон", uron)
         if self.hp2 <= 0:
             messagebox.showinfo("Победа!", "Вы уничтожили вражеский танк!")
             self.novaya_igra()
@@ -141,6 +153,7 @@ class Artduel:
 
     def sled_hod(self, vpravo):
         if vpravo:
+            # после выстрела игрока ходит комп
             self.hod_igroka = False
             self.status.config(text="Ходит компьютер...", fg="#225522")
             self.root.after(900, self.hod_kompa)
@@ -149,12 +162,14 @@ class Artduel:
             self.status.config(text="Ваш ход", fg="#225522")
 
     def hod_kompa(self):
-        # перебираем варианты и берём самый точный
+        # комп прицеливается с небольшой случайной ошибкой
+        dx = abs(X2 - X1)
         best = None
         for _ in range(40):
             ugol = random.randint(25, 70)
             sila = random.randint(45, 85)
             vx, vy = self.skorost(ugol, sila, vpravo=False)
+            # грубо симулируем полёт и смотрим куда упадёт
             x, y, cx, cy = X2, ZEML - 34, vx, vy
             while y < ZEML and 0 < x < W:
                 x += cx
@@ -162,8 +177,9 @@ class Artduel:
                 cy += G
             if best is None or abs(x - X1) < best[0]:
                 best = (abs(x - X1), ugol, sila)
-        ugol = best[1] + random.randint(-4, 4)
-        sila = best[2] + random.randint(-6, 6)
+        ugol, sila = best[1], best[2]
+        ugol += random.randint(-4, 4)
+        sila += random.randint(-6, 6)
         self.status.config(text=f"Комп: угол {ugol}, сила {sila}", fg="#225522")
         vx, vy = self.skorost(ugol, sila, vpravo=False)
         self.zapustit(X2 - 18, ZEML - 34, vx, vy, vpravo=False)
@@ -179,7 +195,19 @@ class Artduel:
         self.status.config(text="Новая игра. Ваш ход", fg="#225522")
 
     def o_programme(self):
-        pass  # потом сделаю
+        # модальное окно - пока его не закроешь, игра не работает
+        okno = tk.Toplevel(self.root)
+        okno.title("О программе")
+        okno.geometry("330x180+300+200")
+        okno.resizable(False, False)
+        okno.transient(self.root)
+        okno.grab_set()
+        tk.Label(okno, text="Артдуэль", font=("Arial", 14, "bold")).pack(pady=10)
+        tk.Label(okno, text="Лабораторная работа № 3\n"
+                            "Приложения с графическим интерфейсом\n"
+                            "Python + tkinter", justify="center").pack()
+        tk.Label(okno, text="Вариант (свой): поединок танков", fg="#666").pack(pady=4)
+        tk.Button(okno, text="Закрыть", command=okno.destroy).pack(pady=8)
 
 
 def main():
