@@ -58,6 +58,8 @@ class Artduel:
 
         self.hp1 = 100
         self.hp2 = 100
+        self.x1 = X1             # стартовые позиции танков
+        self.x2 = X2
         self.hod_igroka = True   # чей сейчас ход
         self.snar = None         # летящий снаряд на канвасе
         self.narisovat()
@@ -66,8 +68,8 @@ class Artduel:
         c = self.canvas
         c.delete("all")
         c.create_rectangle(0, ZEML, W, H, fill=CVET_ZEML, outline="")
-        self.tank(c, X1, CVET_T1, self.hp1, 1)
-        self.tank(c, X2, CVET_T2, self.hp2, 2)
+        self.tank(c, self.x1, CVET_T1, self.hp1, 1)
+        self.tank(c, self.x2, CVET_T2, self.hp2, 2)
 
     def tank(self, c, x, cvet, hp, nomer):
         # корпус, башня и ствол
@@ -95,7 +97,7 @@ class Artduel:
             self.status.config(text="Угол 1..89, сила 10..100", fg="#aa2222")
             return
         vx, vy = self.skorost(ugol, sila, vpravo=True)
-        self.zapustit(X1 + 18, ZEML - 34, vx, vy, vpravo=True)
+        self.zapustit(self.x1 + 18, ZEML - 34, vx, vy, vpravo=True)
 
     def skorost(self, ugol, sila, vpravo):
         # переводим угол и силу в скорость по осям
@@ -115,7 +117,7 @@ class Artduel:
         y = (y1 + y2) / 2 + vy
         vy += G
         c.coords(self.snar, x - 4, y - 4, x + 4, y + 4)
-        tx = X2 if vpravo else X1
+        tx = self.x2 if vpravo else self.x1
         if abs(x - tx) < 28 and y > ZEML - 30:
             self.popal(vpravo)
             return
@@ -151,7 +153,14 @@ class Artduel:
         self.status.config(text="Промах!", fg="#225522")
         self.sled_hod(vpravo)
 
+    def peredvinut(self):
+        # после выстрела танки меняют позиции - прицелиться по памяти не выйдет
+        self.x1 = random.randint(60, W // 2 - 60)
+        self.x2 = random.randint(W // 2 + 60, W - 60)
+        self.narisovat()
+
     def sled_hod(self, vpravo):
+        self.peredvinut()
         if vpravo:
             # после выстрела игрока ходит комп
             self.hod_igroka = False
@@ -163,30 +172,31 @@ class Artduel:
 
     def hod_kompa(self):
         # комп прицеливается с небольшой случайной ошибкой
-        dx = abs(X2 - X1)
         best = None
         for _ in range(40):
             ugol = random.randint(25, 70)
             sila = random.randint(45, 85)
             vx, vy = self.skorost(ugol, sila, vpravo=False)
             # грубо симулируем полёт и смотрим куда упадёт
-            x, y, cx, cy = X2, ZEML - 34, vx, vy
+            x, y, cx, cy = self.x2, ZEML - 34, vx, vy
             while y < ZEML and 0 < x < W:
                 x += cx
                 y += cy
                 cy += G
-            if best is None or abs(x - X1) < best[0]:
-                best = (abs(x - X1), ugol, sila)
+            if best is None or abs(x - self.x1) < best[0]:
+                best = (abs(x - self.x1), ugol, sila)
         ugol, sila = best[1], best[2]
         ugol += random.randint(-4, 4)
         sila += random.randint(-6, 6)
         self.status.config(text=f"Комп: угол {ugol}, сила {sila}", fg="#225522")
         vx, vy = self.skorost(ugol, sila, vpravo=False)
-        self.zapustit(X2 - 18, ZEML - 34, vx, vy, vpravo=False)
+        self.zapustit(self.x2 - 18, ZEML - 34, vx, vy, vpravo=False)
 
     def novaya_igra(self):
         self.hp1 = 100
         self.hp2 = 100
+        self.x1 = X1
+        self.x2 = X2
         self.hod_igroka = True
         if self.snar:
             self.canvas.delete(self.snar)
