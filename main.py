@@ -1,9 +1,15 @@
 """Лаба 3 - Артдуэль: поединок двух танков (tkinter)."""
 
 import math
+import os
 import random
 import tkinter as tk
 from tkinter import messagebox
+
+try:
+    import winsound
+except ImportError:
+    winsound = None
 
 W, H = 900, 450      # размер поля
 ZEML = 400           # уровень земли
@@ -29,7 +35,7 @@ class Artduel:
         igra = tk.Menu(menu, tearoff=0)
         igra.add_command(label="Новая игра", command=self.novaya_igra)
         igra.add_separator()
-        igra.add_command(label="Выход", command=root.destroy)
+        igra.add_command(label="Выход", command=self.vihod)
         menu.add_cascade(label="Игра", menu=igra)
         spravka = tk.Menu(menu, tearoff=0)
         spravka.add_command(label="О программе", command=self.o_programme,
@@ -57,6 +63,15 @@ class Artduel:
         self.veter_lbl.pack(side="left", padx=6)
         self.status = tk.Label(panel, text="Ваш ход", fg="#225522")
         self.status.pack(side="left", padx=10)
+
+        root.protocol("WM_DELETE_WINDOW", self.vihod)
+
+        # фоновая музыка зацикленная (файл bgm.wav рядом с main.py)
+        self.muz_put = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "bgm.wav")
+        if winsound and os.path.exists(self.muz_put):
+            winsound.PlaySound(self.muz_put,
+                               winsound.SND_ASYNC | winsound.SND_LOOP)
 
         self.hp1 = 100
         self.hp2 = 100
@@ -231,6 +246,12 @@ class Artduel:
             self.snar = None
         self.narisovat()
         self.status.config(text="Новая игра. Ваш ход", fg="#225522")
+
+    def vihod(self):
+        # останавливаем музыку и закрываем окно
+        if winsound:
+            winsound.PlaySound(None, winsound.SND_ASYNC)
+        self.root.destroy()
 
     def o_programme(self):
         # модальное окно - пока его не закроешь, игра не работает
