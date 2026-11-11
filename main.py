@@ -144,13 +144,17 @@ class Artduel:
             self.popal(vpravo, x, y)
             return
         if y >= ZEML - 4 or x < -20 or x > W + 20:
-            self.mimo(vpravo)
+            self.mimo(vpravo, x, y)
             return
         self.root.after(20, lambda: self.dvizh(vx, vy, vpravo))
 
-    def vzriv(self, x, y):
-        # три круга разъезжаются и исчезают - простая анимация взрыва
-        for r, cv in ((8, "#ffdd44"), (15, "#ff8830"), (24, "#cc3311")):
+    def vzriv(self, x, y, bolshoy=True):
+        # круги расходятся и исчезают - простая анимация взрыва
+        if bolshoy:
+            krugi = ((8, "#ffdd44"), (15, "#ff8830"), (24, "#cc3311"))
+        else:
+            krugi = ((5, "#cccccc"), (9, "#999999"), (14, "#777777"))
+        for r, cv in krugi:
             kr = self.canvas.create_oval(x - r, y - r, x + r, y + r,
                                          outline=cv, width=3)
             self.root.after(400, lambda k=kr: self.canvas.delete(k))
@@ -161,10 +165,10 @@ class Artduel:
             self.hp2 = max(0, self.hp2 - uron)
         else:
             self.hp1 = max(0, self.hp1 - uron)
-        self.vzriv(x, y)
         self.canvas.delete(self.snar)
         self.snar = None
         self.narisovat()
+        self.vzriv(x, y)   # рисуем уже после перерисовки поля
         kto = "Вы попали!" if vpravo else "Вас ранили!"
         self.status.config(text=f"{kto} Урон {uron}", fg="#aa2222")
         if self.hp2 <= 0:
@@ -175,13 +179,15 @@ class Artduel:
             messagebox.showinfo("Поражение", "Ваш танк уничтожен...")
             self.novaya_igra()
             return
-        self.sled_hod(vpravo)
+        # взрыв должен доиграть, только потом танки едут на новые места
+        self.root.after(500, lambda: self.sled_hod(vpravo))
 
-    def mimo(self, vpravo):
+    def mimo(self, vpravo, x=0, y=0):
         self.canvas.delete(self.snar)
         self.snar = None
+        self.vzriv(x, y, bolshoy=False)   # при промахе - маленькое пылевое облако
         self.status.config(text="Промах!", fg="#225522")
-        self.sled_hod(vpravo)
+        self.root.after(300, lambda: self.sled_hod(vpravo))
 
     def pokaz_veter(self):
         # ветер меняется после каждого выстрела и сносит снаряд в сторону
