@@ -53,6 +53,8 @@ class Artduel:
         self.sila_ent.pack(side="left", padx=4)
         self.sila_ent.insert(0, "50")
         tk.Button(panel, text="Огонь!", command=self.vistrel).pack(side="left", padx=10)
+        self.veter_lbl = tk.Label(panel, text="Ветер:", fg="#555")
+        self.veter_lbl.pack(side="left", padx=6)
         self.status = tk.Label(panel, text="Ваш ход", fg="#225522")
         self.status.pack(side="left", padx=10)
 
@@ -60,6 +62,8 @@ class Artduel:
         self.hp2 = 100
         self.x1 = X1             # стартовые позиции танков
         self.x2 = X2
+        self.veter = 0           # снос снаряда в сторону каждый тик
+        self.pokaz_veter()
         self.hod_igroka = True   # чей сейчас ход
         self.snar = None         # летящий снаряд на канвасе
         self.narisovat()
@@ -113,25 +117,36 @@ class Artduel:
     def dvizh(self, vx, vy, vpravo):
         c = self.canvas
         x1, y1, x2, y2 = c.coords(self.snar)
-        x = (x1 + x2) / 2 + vx
+        x = (x1 + x2) / 2 + vx + self.veter * 0.12
         y = (y1 + y2) / 2 + vy
         vy += G
         c.coords(self.snar, x - 4, y - 4, x + 4, y + 4)
+        # точки-след за снарядом, гаснут сами через 700 мс
+        sled = c.create_oval(x - 1, y - 1, x + 1, y + 1, fill="#555", outline="")
+        self.root.after(700, lambda: c.delete(sled))
         tx = self.x2 if vpravo else self.x1
         if abs(x - tx) < 28 and y > ZEML - 30:
-            self.popal(vpravo)
+            self.popal(vpravo, x, y)
             return
         if y >= ZEML - 4 or x < -20 or x > W + 20:
             self.mimo(vpravo)
             return
         self.root.after(20, lambda: self.dvizh(vx, vy, vpravo))
 
-    def popal(self, vpravo):
+    def vzriv(self, x, y):
+        # три круга разъезжаются и исчезают - простая анимация взрыва
+        for r, cv in ((8, "#ffdd44"), (15, "#ff8830"), (24, "#cc3311")):
+            kr = self.canvas.create_oval(x - r, y - r, x + r, y + r,
+                                         outline=cv, width=3)
+            self.root.after(400, lambda k=kr: self.canvas.delete(k))
+
+    def popal(self, vpravo, x=0, y=0):
         uron = random.randint(15, 35)
         if vpravo:
             self.hp2 = max(0, self.hp2 - uron)
         else:
             self.hp1 = max(0, self.hp1 - uron)
+        self.vzriv(x, y)
         self.canvas.delete(self.snar)
         self.snar = None
         self.narisovat()
@@ -153,10 +168,22 @@ class Artduel:
         self.status.config(text="Промах!", fg="#225522")
         self.sled_hod(vpravo)
 
+    def pokaz_veter(self):
+        # ветер меняется после каждого выстрела и сносит снаряд в сторону
+        self.veter = random.randint(-4, 4)
+        if self.veter > 0:
+            strelka = "→ " + str(self.veter)
+        elif self.veter < 0:
+            strelka = "← " + str(-self.veter)
+        else:
+            strelka = "штиль"
+        self.veter_lbl.config(text="Ветер: " + strelka)
+
     def peredvinut(self):
         # после выстрела танки меняют позиции - прицелиться по памяти не выйдет
         self.x1 = random.randint(60, W // 2 - 60)
         self.x2 = random.randint(W // 2 + 60, W - 60)
+        self.pokaz_veter()
         self.narisovat()
 
     def sled_hod(self, vpravo):
@@ -180,7 +207,7 @@ class Artduel:
             # грубо симулируем полёт и смотрим куда упадёт
             x, y, cx, cy = self.x2, ZEML - 34, vx, vy
             while y < ZEML and 0 < x < W:
-                x += cx
+                x += cx + self.veter * 0.12
                 y += cy
                 cy += G
             if best is None or abs(x - self.x1) < best[0]:
@@ -197,6 +224,7 @@ class Artduel:
         self.hp2 = 100
         self.x1 = X1
         self.x2 = X2
+        self.pokaz_veter()
         self.hod_igroka = True
         if self.snar:
             self.canvas.delete(self.snar)
